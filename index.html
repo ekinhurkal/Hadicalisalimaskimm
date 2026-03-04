@@ -329,12 +329,21 @@
     var p=ts.split(':'),h=parseInt(p[0],10),m=parseInt(p[1],10);
     var now=new Date(),next=new Date();next.setHours(h,m,0,0);
     if(next<=now)next.setDate(next.getDate()+1);
-    notifTimer=setTimeout(function(){fireNotif();scheduleNotif(ts);},next-now);
+    var delay=next-now;
+    notifTimer=setTimeout(function(){
+      fireNotif();
+      scheduleNotif(ts);
+    },delay);
   }
   function fireNotif(){
-    if(Notification.permission!=='granted'||days[todayKey()])return;
-    var msg=MSGS[new Date().getDay()%MSGS.length];
-    new Notification(msg.t,{body:msg.b,tag:'antrenman'});
+    if(Notification.permission!=='granted') return;
+    if(days[todayKey()]) return;
+    if(navigator.serviceWorker && navigator.serviceWorker.controller){
+      navigator.serviceWorker.controller.postMessage({type:'SHOW_NOTIFICATION'});
+    } else {
+      var msg=MSGS[new Date().getDay()%MSGS.length];
+      new Notification(msg.t,{body:msg.b,tag:'antrenman'});
+    }
   }
   function showToast(msg){
     var el=document.createElement('div');
@@ -348,6 +357,15 @@
   if(savedT)scheduleNotif(savedT);
   else if(typeof Notification!=='undefined'&&Notification.permission!=='granted')
     setTimeout(function(){document.getElementById('notif-banner').classList.add('show');},3000);
+
+  // Service Worker kaydet (iOS bildirimleri için şart)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').then(function(reg){
+      console.log('SW registered:', reg.scope);
+    }).catch(function(err){
+      console.log('SW error:', err);
+    });
+  }
 
   var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
   var isStandalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone;
